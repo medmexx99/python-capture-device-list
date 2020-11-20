@@ -1,3 +1,4 @@
+#define PY_SSIZE_T_CLEAN /* Make "s#" use Py_ssize_t rather than int. */
 #include <Python.h>
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/dd377566(v=vs.85).aspx
@@ -7,22 +8,9 @@
 
 #pragma comment(lib, "strmiids")
 
-#if PY_MAJOR_VERSION >= 3
-#ifndef IS_PY3K
-#define IS_PY3K 1
-#endif
-#endif
+static PyObject *DeviceError;
 
-struct module_state {
-    PyObject *error;
-};
-
-#if defined(IS_PY3K)
-#define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
-#else
-#define GETSTATE(m) (&_state)
-static struct module_state _state;
-#endif
+// #define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
 
 // #pragma comment(lib, "kernel32")
 // #pragma comment(lib, "user32")
@@ -128,10 +116,11 @@ static PyObject *
 getDeviceList(PyObject *self, PyObject *args)
 {
 	PyObject* pyList = NULL; 
+	HRESULT hr = NULL;
 	
-	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-	if (SUCCEEDED(hr))
-	{
+	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	// if (SUCCEEDED(hr))
+	// {
 		IEnumMoniker *pEnum;
 
 		hr = EnumerateDevices(CLSID_VideoInputDeviceCategory, &pEnum);
@@ -141,72 +130,57 @@ getDeviceList(PyObject *self, PyObject *args)
 			pEnum->Release();
 		}
 		CoUninitialize();
-	}
+	// }
 
     return pyList;
 }
 
 static PyMethodDef Methods[] =
 {
-    {"getDeviceList", getDeviceList, METH_VARARGS, NULL},
-    {NULL, NULL, 0, NULL}
+    {
+		"getDeviceList",
+		(PyCFunction)getDeviceList,
+		METH_VARARGS,
+		PyDoc_STR("Return a list of camera devices of type str.")
+	},
+
+    {NULL, NULL, 0, NULL} // Sentinel
 };
-
-PyMODINIT_FUNC
-initdevice(void);
-
-#if defined(IS_PY3K)
-
-static int device_traverse(PyObject *m, visitproc visit, void *arg) {
-    Py_VISIT(GETSTATE(m)->error);
-    return 0;
-}
-
-static int device_clear(PyObject *m) {
-    Py_CLEAR(GETSTATE(m)->error);
-    return 0;
-}
 
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "device",
-    NULL,
-    sizeof(struct module_state),
+	PyDoc_STR("This module lists the attached camera devices using DirectShow API. Works in Windows only."),
+    // sizeof(struct module_state),
+	-1,
     Methods,
     NULL,
-    device_traverse,
-    device_clear,
+    NULL,
+    NULL,
     NULL
 };
 
-#define INITERROR return NULL
-
 PyMODINIT_FUNC
 PyInit_device(void)
-
-#else
-#define INITERROR return
-void
-initdevice(void)
-#endif
 {
-#if defined(IS_PY3K)
     PyObject *module = PyModule_Create(&moduledef);
-#else
-    PyObject *module = Py_InitModule("device", Methods);
-#endif
 
     if (module == NULL)
-        INITERROR;
-    struct module_state *st = GETSTATE(module);
+        return NULL;
 
-    st->error = PyErr_NewException("dbr.Error", NULL, NULL);
-    if (st->error == NULL) {
+	if (DeviceError == NULL) {
+		DeviceError = PyErr_NewException("device.error", NULL, NULL);
+		if (DeviceError == NULL) return NULL;
+		Py_INCREF(DeviceError);
+	}
+
+    if (PyModule_AddObject(module, "error", DeviceError) < 0) {
+		PyErr_SetString(DeviceError, "System command failed");
+        Py_DECREF(DeviceError);
+        Py_CLEAR(DeviceError);
         Py_DECREF(module);
-        INITERROR;
+        return NULL;
     }
 
-#if defined(IS_PY3K)
     return module;
-#endif
 }

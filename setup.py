@@ -2,7 +2,8 @@ from distutils.core import setup, Extension
 
 module_device = Extension('device',
                         sources = ['device.cpp'], 
-                        library_dirs=['G:\Program Files\Microsoft SDKs\Windows\v6.1\Lib']
+                        # library_dirs=['C:\\Program Files\Microsoft SDKs\Windows\v6.1\Lib']
+                        library_dirs=[r'C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64']
                       )
 
 setup (name = 'WindowsDevices',
