@@ -76,8 +76,14 @@ PyObject* DisplayDeviceInformation(IEnumMoniker *pEnum)
 		{
 			// Append a result to Python list
 			char  *pValue = _com_util::ConvertBSTRToString(var.bstrVal);
-			hr = PyList_Append(pyList, Py_BuildValue("s", pValue));
-			delete[] pValue;  
+
+			PyObject *val = Py_BuildValue("N", PyUnicode_DecodeLocale(pValue, NULL));
+			if (val == 0) {
+				printf("Failed to convert com value to python %s\n", pValue);
+				return pyList;
+			}
+			hr = PyList_Append(pyList, val);
+			delete[] pValue;
 			if (FAILED(hr)) {
 				printf("Failed to append the object item at the end of list list\n");
 				return pyList;
@@ -115,14 +121,13 @@ PyObject* DisplayDeviceInformation(IEnumMoniker *pEnum)
 static PyObject *
 getDeviceList(PyObject *self, PyObject *args)
 {
-	PyObject* pyList = NULL; 
+	PyObject* pyList = NULL;
 	HRESULT hr = NULL;
-	
-	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-	// if (SUCCEEDED(hr))
-	// {
-		IEnumMoniker *pEnum;
 
+	hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	if (SUCCEEDED(hr))
+	{
+		IEnumMoniker *pEnum;
 		hr = EnumerateDevices(CLSID_VideoInputDeviceCategory, &pEnum);
 		if (SUCCEEDED(hr))
 		{
@@ -130,8 +135,7 @@ getDeviceList(PyObject *self, PyObject *args)
 			pEnum->Release();
 		}
 		CoUninitialize();
-	// }
-
+	}
     return pyList;
 }
 
